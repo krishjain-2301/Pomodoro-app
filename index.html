@@ -8,6 +8,20 @@
   <link href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
   
   <style>
+    /* ── Immersive Focus Mode Animations ── */
+    body { transition: background 0.5s ease; }
+    .top-controls, .pills, .time-display, .flip-display, .actions, .custom-setup {
+      transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1), font-size 0.7s cubic-bezier(0.4, 0, 0.2, 1), margin 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    body.session-active .top-controls { opacity: 0; pointer-events: none; transform: translateY(-2rem); }
+    body.session-active .pills { opacity: 0; pointer-events: none; transform: scale(0.9); margin-bottom: -1.5rem; }
+    body.session-active .custom-setup { opacity: 0; pointer-events: none; transform: scale(0.9); margin-top: -3.5rem; margin-bottom: 0; }
+    body.session-active .time-display { font-size: clamp(9rem, 26vw, 20rem); transform: translateY(6vh); text-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+    body.session-active .flip-display { transform: scale(1.45) translateY(4vh); transform-origin: center top; }
+    body.session-active .actions { transform: translateY(12vh); opacity: 0.3; }
+    body.session-active .actions:hover { opacity: 1; }
+    body.session-active .float-tasks, body.session-active .float-spotify { opacity: 0 !important; transform: translateY(10vh) scale(0.95); pointer-events: none; }
+
     /* ── Reset ──────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
@@ -419,7 +433,9 @@
   <!-- Right Controls -->
   <div class="top-controls tc-right">
     <button class="toggle-btn" onclick="toggleWidget('spotify')">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 5.523 4.477 10 10 10 5.523 0 10-4.477 10-10C22 6.477 17.523 2 12 2zm4.586 14.424c-.18.295-.563.387-.857.207-2.35-1.434-5.305-1.76-8.784-.963-.335.077-.67-.133-.746-.47-.077-.334.132-.67.47-.745 3.808-.87 7.076-.496 9.71 1.115.293.18.386.563.206.856zm1.2-2.715c-.225.365-.694.48-1.05.26-2.684-1.644-6.786-2.122-9.965-1.16-.406.122-.84-.108-.962-.513-.122-.406.108-.84.512-.962 3.65-1.106 8.16-.576 11.205 1.29.355.216.47.685.25 1.04v.045zm.106-2.835C14.698 9.006 8.528 8.78 4.962 9.864c-.482.146-.99-.126-1.135-.606-.145-.48.125-.99.605-1.134 4.09-1.246 10.9-1.002 14.773 1.295.433.256.575.824.32 1.256-.255.432-.824.575-1.256.32h-.002z"/></svg>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M21.582,6.186c-0.23-0.86-0.908-1.538-1.768-1.768C18.254,4,12,4,12,4S5.746,4,4.186,4.418c-0.86,0.23-1.538,0.908-1.768,1.768C2,7.746,2,12,2,12s0,4.254,0.418,5.814c0.23,0.86,0.908,1.538,1.768,1.768C5.746,20,12,20,12,20s6.254,0,7.814-0.418c0.86-0.23,1.538-0.908,1.768-1.768C22,16.254,22,12,22,12S22,7.746,21.582,6.186z M9.5,15.5v-7L15.5,12L9.5,15.5z"/>
+      </svg>
       Music
     </button>
     <button class="toggle-btn" onclick="toggleWidget('tasks')">
@@ -628,8 +644,8 @@
     }
 
     function toggleTimer() { isRunning ? pauseTimer() : startTimer(); }
-    function startTimer() { isRunning = true; domStart.textContent = 'Pause'; interval = setInterval(tick, 1000); }
-    function pauseTimer() { isRunning = false; clearInterval(interval); domStart.textContent = 'Start'; }
+    function startTimer() { isRunning = true; document.body.classList.add('session-active'); domStart.textContent = 'Pause'; interval = setInterval(tick, 1000); }
+    function pauseTimer() { isRunning = false; document.body.classList.remove('session-active'); clearInterval(interval); domStart.textContent = 'Start'; }
     function resetTimer() { pauseTimer(); if(isStopwatch) elapsedSec = 0; else remainSec = totalSec; updateDisplay(); }
     function skipTimer() { if(isStopwatch) resetTimer(); else finishSession(); }
 
