@@ -428,15 +428,15 @@
     </button>
   </div>
 
-  <!-- FLOATING SPOTIFY -->
+  <!-- FLOATING MUSIC -->
   <div class="float-spotify" id="spotWidget">
     <div class="t-header">
       <h3>Music</h3>
     </div>
     <div class="t-input-wrap">
-      <input type="text" id="spotInput" placeholder="Paste Spotify link..." onkeydown="if(event.key==='Enter')loadSpotify()">
+      <input type="text" id="musicInput" placeholder="Paste YouTube link..." onkeydown="if(event.key==='Enter')loadMusic()">
     </div>
-    <iframe id="spotIframe" style="border-radius:12px" src="https://open.spotify.com/embed/playlist/37i9dQZF1DWZeKCadgRdKQ?utm_source=generator&theme=0" width="100%" height="80" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+    <iframe id="musicIframe" style="border-radius:12px" src="https://www.youtube.com/embed/jfKfPfyJRdk" width="100%" height="164" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe>
   </div>
 
   <!-- FLOATING TASKS -->
@@ -580,22 +580,26 @@
       });
     }
 
-    /* ── Spotify Integration ─────────────────────── */
-    function loadSpotify() {
-      const inp = document.getElementById('spotInput');
-      const frame = document.getElementById('spotIframe');
+    /* ── Music Integration (YouTube) ─────────────────────── */
+    function loadMusic() {
+      const inp = document.getElementById('musicInput');
+      const frame = document.getElementById('musicIframe');
       let url = inp.value.trim();
       if(!url) return;
       
-      if(url.includes('open.spotify.com')) {
-        if(!url.includes('/embed/')) {
-          const parts = url.split('open.spotify.com/');
-          if(parts.length > 1) {
-            url = 'https://open.spotify.com/embed/' + parts[1].split('?')[0] + '?utm_source=generator&theme=0';
-          }
-        }
-        frame.src = url;
-        localStorage.setItem('min-spotify', url);
+      let vid = '';
+      if(url.includes('youtube.com/watch?v=')) {
+        vid = url.split('v=')[1].split('&')[0];
+      } else if(url.includes('youtu.be/')) {
+        vid = url.split('youtu.be/')[1].split('?')[0];
+      } else if(url.includes('youtube.com/embed/')) {
+        vid = url.split('embed/')[1].split('?')[0];
+      }
+
+      if(vid) {
+        const embedUrl = 'https://www.youtube.com/embed/' + vid;
+        frame.src = embedUrl;
+        localStorage.setItem('min-music', embedUrl);
         inp.value = ''; // clear input on success
       }
     }
@@ -699,8 +703,8 @@
     }
 
     // Init
-    const savedSpot = localStorage.getItem('min-spotify');
-    if(savedSpot) document.getElementById('spotIframe').src = savedSpot;
+    const savedMusic = localStorage.getItem('min-music');
+    if(savedMusic) document.getElementById('musicIframe').src = savedMusic;
     
     updateDisplay();
     renderTasks();
