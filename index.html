@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FlowState — Focus Timer</title>
+  
+  <link href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
+  
+  <style>
+    /* ── Reset ──────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+    html, body {
+      font-family: 'Satoshi', sans-serif;
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden; 
+      color: #ffffff;
+      background-color: #0b0c10; 
+    }
+
+    /* ── Immersive Dark Background ──────────────────────── */
+    .bg-image {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background-image: url('https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=2500&auto=format&fit=crop');
+      background-size: cover;
+      background-position: center;
+      z-index: -2;
+    }
+    .bg-overlay {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 100%);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: -1;
+    }
+
+    /* ── Main Centered Layout ──────────────────────── */
+    main {
+      position: absolute;
+      top: 48%; 
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      max-width: 800px;
+    }
+
+    /* Top Pills */
+    .pills {
+      display: flex;
+      gap: 0.8rem;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .pill {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      padding: 0.6rem 1.4rem;
+      border-radius: 100px;
+      color: #fff;
+      font-family: 'Satoshi', sans-serif;
+      font-weight: 500;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      letter-spacing: 0.02em;
+    }
+    .pill:hover {
+      border-color: rgba(255, 255, 255, 0.8);
+      background: rgba(255, 255, 255, 0.1);
+    }
+    .pill.active {
+      background: #ffffff;
+      color: #000000;
+      border-color: #ffffff;
+      font-weight: 600;
+    }
+
+    /* Minimal Timer */
+    .time-display {
+      font-family: 'Satoshi', sans-serif;
+      font-size: clamp(6rem, 15vw, 12rem);
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      margin-bottom: 2.5rem;
+      user-select: none;
+      text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+
+    /* FULLY ANIMATED FLIP CLOCK */
+    .flip-display {
+      display: none; 
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 2.5rem;
+      user-select: none;
+    }
+    .flip-group { display: flex; gap: 0.3rem; }
+    .flip-divider {
+      font-family: 'Satoshi', sans-serif;
+      font-size: clamp(4rem, 10vw, 7rem);
+      font-weight: 700;
+      margin-top: -1rem;
+      text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+
+    /* Clock Card Core Geometry */
+    .flip-card {
+      position: relative;
+      width: clamp(4.5rem, 10vw, 8rem);
+      height: clamp(6.5rem, 15vw, 11rem);
+      font-family: 'Satoshi', sans-serif;
+      font-size: clamp(4.5rem, 11vw, 8rem);
+      font-weight: 700;
+      perspective: 1200px;
+      border-radius: 12px;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+      z-index: 1;
+    }
+
+    /* Pieces */
+    .c-static-top, .c-static-bot, .c-flip-top, .c-flip-bot {
+      position: absolute; left: 0; width: 100%; height: 50%;
+      background: #121214; color: #fff; overflow: hidden;
+    }
+
+    .c-static-top::before, .c-static-bot::before, 
+    .c-flip-top::before, .c-flip-bot::before {
+      content: attr(data-val);
+      position: absolute; width: 100%; height: 200%;
+      display: flex; align-items: center; justify-content: center; left: 0;
+    }
+
+    /* Top halves */
+    .c-static-top, .c-flip-top {
+      top: 0; border-radius: 12px 12px 0 0;
+      border-bottom: 1.5px solid rgba(0,0,0,0.8);
+      transform-origin: bottom;
+    }
+    .c-static-top::before, .c-flip-top::before { top: 0; }
+
+    /* Bottom halves */
+    .c-static-bot, .c-flip-bot {
+      bottom: 0; border-radius: 0 0 12px 12px;
+      transform-origin: top;
+    }
+    .c-static-bot::before, .c-flip-bot::before { bottom: 0; }
+
+    .c-flip-top, .c-flip-bot { z-index: 5; } /* Render anim above static */
+
+    /* The Mechanical Flip Animations */
+    .c-flip-top { animation: flipTop 0.3s ease-in forwards; backface-visibility: hidden; }
+    .c-flip-bot { transform: rotateX(90deg); animation: flipBot 0.3s ease-out 0.3s forwards; backface-visibility: hidden; }
+
+    @keyframes flipTop {
+      0% { transform: rotateX(0deg); }
+      100% { transform: rotateX(-90deg); }
+    }
+    @keyframes flipBot {
+      0% { transform: rotateX(90deg); }
+      100% { transform: rotateX(0deg); }
+    }
+
+
+    /* Custom Input Layout */
+    .custom-setup {
+      display: none;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 0.8rem 1.5rem;
+      border-radius: 16px;
+      align-items: center;
+      justify-content: center;
+      gap: 0.8rem;
+      margin-bottom: 2rem;
+      margin-top: -1rem;
+    }
+    .custom-setup input {
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 1.6rem;
+      width: 60px;
+      text-align: center;
+      outline: none;
+      font-family: 'Satoshi', sans-serif;
+      font-weight: 600;
+      border-bottom: 2px solid rgba(255,255,255,0.4);
+      transition: border-color 0.2s;
+    }
+    .custom-setup input:focus { border-color: #fff; }
+    .custom-setup span { font-size: 1.2rem; font-weight: 500; color: rgba(255,255,255,0.7); }
+    .custom-setup button {
+      background: #fff; color: #000;
+      border: none; border-radius: 8px; padding: 0.6rem 1.2rem;
+      font-weight: 700; cursor: pointer; font-family: 'Satoshi', sans-serif;
+      font-size: 1.1rem;
+      margin-left: 0.5rem;
+      transition: transform 0.2s;
+    }
+    .custom-setup button:hover { transform: scale(1.05); }
+
+    /* Bottom Actions (Start, Reset, Mode) */
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 1.2rem;
+      position: relative;
+    }
+    .start-btn {
+      background: #ffffff;
+      color: #000000;
+      border: none;
+      border-radius: 100px;
+      padding: 1.2rem 3.5rem;
+      font-family: 'Satoshi', sans-serif;
+      font-weight: 700;
+      font-size: 1.5rem;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    .start-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    }
+    .start-btn:active { transform: scale(0.97); }
+
+    .icon-btn {
+      background: transparent;
+      border: none;
+      color: #ffffff;
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      opacity: 0.8;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    .icon-btn:hover {
+      opacity: 1;
+      transform: scale(1.1);
+    }
+
+    /* ── Floating Spotfiy (Bottom Left) ──────────────────────── */
+    .float-spotify {
+      position: absolute;
+      bottom: 2rem;
+      left: 2rem;
+      width: 320px;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+    .float-spotify.hidden {
+      transform: translateY(15vh);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* ── Floating Tasks (Bottom Right) ──────────────────────── */
+    .float-tasks {
+      position: absolute;
+      bottom: 2rem;
+      right: 2rem;
+      width: 340px;
+      max-height: 40vh;
+      display: flex;
+      flex-direction: column;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 1.5rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+    .float-tasks.hidden {
+      transform: translateY(15vh);
+      opacity: 0;
+      pointer-events: none;
+    }
+    
+    .t-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .t-header h3 {
+      font-family: 'Satoshi', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin: 0;
+    }
+    .t-input-wrap {
+      display: flex;
+      margin-bottom: 1rem;
+      background: rgba(255,255,255,0.05);
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .t-input-wrap input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      padding: 0.8rem 1rem;
+      color: #fff;
+      font-family: 'Satoshi', sans-serif;
+      font-size: 0.95rem;
+      outline: none;
+    }
+    .t-input-wrap input::placeholder { color: rgba(255,255,255,0.4); }
+    .t-input-wrap button {
+      background: transparent; border: none; color: #fff;
+      padding: 0 1rem; cursor: pointer; opacity: 0.7; transition: opacity 0.2s;
+    }
+    .t-input-wrap button:hover { opacity: 1; }
+    
+    .t-list {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      padding-right: 4px;
+    }
+    .t-list::-webkit-scrollbar { width: 4px; }
+    .t-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+
+    .task-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.8rem;
+    }
+    .task-item.done { opacity: 0.4; }
+    .task-item.done .t-text { text-decoration: line-through; }
+    .chk {
+      width: 20px; height: 20px; border: 1px solid rgba(255,255,255,0.5);
+      border-radius: 6px; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; margin-top: 2px; transition: all 0.2s;
+    }
+    .chk:hover { border-color: #fff; }
+    .task-item.done .chk { background: #fff; border-color: #fff; }
+    .chk svg { display: none; width: 12px; height: 12px; color: #000; }
+    .task-item.done .chk svg { display: block; }
+    .t-text { flex: 1; font-size: 0.95rem; line-height: 1.4; word-break: break-word; }
+    .del { background: none; border: none; color: rgba(255,255,255,0.4); cursor: pointer; transition: color 0.2s; }
+    .task-item:hover .del { color: #fff; }
+
+    /* ── Toggles Top Left & Right ──────────────────────── */
+    .top-controls {
+      position: absolute;
+      top: 2rem;
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .tc-left { left: 2rem; }
+    .tc-right { right: 2rem; }
+
+    .toggle-btn {
+      background: rgba(0,0,0,0.3);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 100px;
+      padding: 0.6rem 1.2rem;
+      color: #fff;
+      font-family: 'Satoshi', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .toggle-btn:hover { background: rgba(0,0,0,0.6); border-color: rgba(255,255,255,0.4); }
+
+  </style>
+</head>
+<body>
+
+  <!-- Deep Moody Background Image -->
+  <div class="bg-image"></div>
+  <div class="bg-overlay"></div>
+
+  <!-- Left Controls -->
+  <div class="top-controls tc-left">
+    <button class="toggle-btn" id="modeBtn" onclick="toggleMode()">
+      ⏱ Stopwatch
+    </button>
+    <button class="toggle-btn" id="viewBtn" onclick="toggleView()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Flip Clock
+    </button>
+
+  </div>
+
+  <!-- Right Controls -->
+  <div class="top-controls tc-right">
+    <button class="toggle-btn" onclick="toggleWidget('spotify')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 5.523 4.477 10 10 10 5.523 0 10-4.477 10-10C22 6.477 17.523 2 12 2zm4.586 14.424c-.18.295-.563.387-.857.207-2.35-1.434-5.305-1.76-8.784-.963-.335.077-.67-.133-.746-.47-.077-.334.132-.67.47-.745 3.808-.87 7.076-.496 9.71 1.115.293.18.386.563.206.856zm1.2-2.715c-.225.365-.694.48-1.05.26-2.684-1.644-6.786-2.122-9.965-1.16-.406.122-.84-.108-.962-.513-.122-.406.108-.84.512-.962 3.65-1.106 8.16-.576 11.205 1.29.355.216.47.685.25 1.04v.045zm.106-2.835C14.698 9.006 8.528 8.78 4.962 9.864c-.482.146-.99-.126-1.135-.606-.145-.48.125-.99.605-1.134 4.09-1.246 10.9-1.002 14.773 1.295.433.256.575.824.32 1.256-.255.432-.824.575-1.256.32h-.002z"/></svg>
+      Music
+    </button>
+    <button class="toggle-btn" onclick="toggleWidget('tasks')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Tasks
+    </button>
+  </div>
+
+  <!-- FLOATING SPOTIFY -->
+  <div class="float-spotify" id="spotWidget">
+    <iframe style="border-radius:16px" src="https://open.spotify.com/embed/playlist/37i9dQZF1DWZeKCadgRdKQ?utm_source=generator&theme=0" width="100%" height="152" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+  </div>
+
+  <!-- FLOATING TASKS -->
+  <div class="float-tasks" id="taskWidget">
+    <div class="t-header">
+      <h3>Tasks</h3>
+      <button onclick="clearCompleted()" style="background:none;border:none;color:rgba(255,255,255,0.5);cursor:pointer;font-size:0.8rem;">Clear Done</button>
+    </div>
+    <div class="t-input-wrap">
+      <input type="text" id="tInput" placeholder="Add a task..." onkeydown="if(event.key==='Enter')addTask()">
+      <button onclick="addTask()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+    </div>
+    <div class="t-list" id="tList"></div>
+  </div>
+
+  <!-- MAIN CENTERED UI -->
+  <main>
+    <div class="pills" id="pillsWrap">
+      <button class="pill active" id="p-pomodoro" onclick="setSession('pomodoro')">Pomodoro</button>
+      <button class="pill" id="p-short" onclick="setSession('short')">Short Break</button>
+      <button class="pill" id="p-long" onclick="setSession('long')">Long Break</button>
+      <button class="pill" id="p-custom" onclick="setSession('custom')">Custom</button>
+    </div>
+
+    <!-- Minimal View Time -->
+    <div class="time-display" id="timeDisplay">25:00</div>
+
+    <!-- Flip Clock View Time -->
+    <div class="flip-display" id="flipDisplay">
+      <div class="flip-group">
+        <div class="flip-card" id="d-m1"><div class="c-static-top" id="d-m1-stat-t" data-val="2"></div><div class="c-static-bot" id="d-m1-stat-b" data-val="2"></div></div>
+        <div class="flip-card" id="d-m2"><div class="c-static-top" id="d-m2-stat-t" data-val="5"></div><div class="c-static-bot" id="d-m2-stat-b" data-val="5"></div></div>
+      </div>
+      <div class="flip-divider">:</div>
+      <div class="flip-group">
+        <div class="flip-card" id="d-s1"><div class="c-static-top" id="d-s1-stat-t" data-val="0"></div><div class="c-static-bot" id="d-s1-stat-b" data-val="0"></div></div>
+        <div class="flip-card" id="d-s2"><div class="c-static-top" id="d-s2-stat-t" data-val="0"></div><div class="c-static-bot" id="d-s2-stat-b" data-val="0"></div></div>
+      </div>
+    </div>
+
+    <!-- Expanded Custom Input popup -->
+    <div class="custom-setup" id="custSetup">
+      <input type="number" id="cMin" value="25" min="1" max="99"> <span>m</span>
+      <input type="number" id="cSec" value="0" min="0" max="59"> <span>s</span>
+      <button onclick="applyCustom()">Set</button>
+    </div>
+
+    <div class="actions">
+      <button class="start-btn" id="btnStart" onclick="toggleTimer()">Start</button>
+      
+      <button class="icon-btn" onclick="resetTimer()" title="Reset">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      </button>
+      
+      <button class="icon-btn" onclick="skipTimer()" title="Skip Session">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+      </button>
+    </div>
+  </main>
+
+  <script>
+    /* ── UI Toggles ──────────────────────── */
+    function toggleWidget(w) {
+      if(w==='spotify') document.getElementById('spotWidget').classList.toggle('hidden');
+      if(w==='tasks') document.getElementById('taskWidget').classList.toggle('hidden');
+    }
+    
+
+
+    let isFlip = false;
+    function toggleView() {
+      isFlip = !isFlip;
+      document.getElementById('viewBtn').innerHTML = isFlip ? 
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Minimal Clock' : 
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Flip Clock';
+      
+      document.getElementById('timeDisplay').style.display = isFlip ? 'none' : 'block';
+      document.getElementById('flipDisplay').style.display = isFlip ? 'flex' : 'none';
+      if(isFlip) { forceFlipDraw(); }
+    }
+
+    let isStopwatch = false;
+    function toggleMode(){
+      isStopwatch = !isStopwatch;
+      document.getElementById('modeBtn').innerHTML = isStopwatch ? '⏳ Countdown' : '⏱ Stopwatch';
+      document.getElementById('pillsWrap').style.display = isStopwatch ? 'none' : 'flex';
+      document.getElementById('custSetup').style.display = 'none';
+      pauseTimer();
+      if(isStopwatch) { elapsedSec = 0; }
+      else { remainSec = totalSec; }
+      updateDisplay();
+    }
+
+    /* ── Mechanized Flip Update ─────────────────────── */
+    function updateDigit(idPrefix, nextVal) {
+      const parent = document.getElementById(idPrefix);
+      const statT = document.getElementById(`${idPrefix}-stat-t`);
+      const statB = document.getElementById(`${idPrefix}-stat-b`);
+      
+      const curVal = statB.getAttribute('data-val');
+      if (curVal === String(nextVal)) return;
+      
+      // Prep waiting value underneath
+      statT.setAttribute('data-val', nextVal);
+      
+      // Cleanup any stuck animations rapidly
+      const existingFlipers = parent.querySelectorAll('.c-flip-top, .c-flip-bot');
+      existingFlipers.forEach(el => parent.removeChild(el));
+
+      // Generate flipping cards
+      const flipT = document.createElement('div');
+      flipT.className = 'c-flip-top';
+      flipT.setAttribute('data-val', curVal);
+      
+      const flipB = document.createElement('div');
+      flipB.className = 'c-flip-bot';
+      flipB.setAttribute('data-val', nextVal);
+      
+      parent.appendChild(flipT);
+      parent.appendChild(flipB);
+      
+      // Complete anim lifecycle
+      setTimeout(() => {
+        statB.setAttribute('data-val', nextVal);
+        if(parent.contains(flipT)) parent.removeChild(flipT);
+        if(parent.contains(flipB)) parent.removeChild(flipB);
+      }, 650); // Matches CSS transition length safely
+    }
+
+    function forceFlipDraw() {
+      const s = isStopwatch ? elapsedSec : remainSec;
+      const mm = String(Math.floor(s / 60)).padStart(2, '0');
+      const ss = String(s % 60).padStart(2, '0');
+      // Direct write bypasses animation logic if just switching views
+      ['d-m1','d-m2','d-s1','d-s2'].forEach((prefix, i) => {
+        const val = (i===0)?mm[0]:(i===1)?mm[1]:(i===2)?ss[0]:ss[1];
+        document.getElementById(`${prefix}-stat-t`).setAttribute('data-val', val);
+        document.getElementById(`${prefix}-stat-b`).setAttribute('data-val', val);
+      });
+    }
+
+    /* ── Timer Logic ─────────────────────── */
+    const presets = { pomodoro: 25*60, short: 5*60, long: 15*60, custom: 25*60 };
+    let activeSess = 'pomodoro', totalSec = presets.pomodoro, remainSec = totalSec, elapsedSec = 0;
+    let isRunning = false, interval = null;
+    const domTime = document.getElementById('timeDisplay'), domStart = document.getElementById('btnStart');
+
+    function setSession(type) {
+      if(isRunning) pauseTimer();
+      activeSess = type;
+      document.querySelectorAll('.pill').forEach(btn => btn.classList.remove('active'));
+      document.getElementById('p-' + type).classList.add('active');
+      document.getElementById('custSetup').style.display = (type === 'custom') ? 'flex' : 'none';
+      if(type !== 'custom') { totalSec = presets[type]; remainSec = totalSec; updateDisplay(); }
+    }
+
+    function applyCustom() {
+      const m = parseInt(document.getElementById('cMin').value) || 0;
+      const s = parseInt(document.getElementById('cSec').value) || 0;
+      if (m === 0 && s === 0) return;
+      totalSec = m * 60 + s; remainSec = totalSec; presets.custom = totalSec;
+      updateDisplay(); document.getElementById('custSetup').style.display = 'none';
+    }
+
+    function toggleTimer() { isRunning ? pauseTimer() : startTimer(); }
+    function startTimer() { isRunning = true; domStart.textContent = 'Pause'; interval = setInterval(tick, 1000); }
+    function pauseTimer() { isRunning = false; clearInterval(interval); domStart.textContent = 'Start'; }
+    function resetTimer() { pauseTimer(); if(isStopwatch) elapsedSec = 0; else remainSec = totalSec; updateDisplay(); }
+    function skipTimer() { if(isStopwatch) resetTimer(); else finishSession(); }
+
+    function tick() {
+      if(isStopwatch) { elapsedSec++; updateDisplay(); } 
+      else { if (remainSec <= 0) { finishSession(); return; } remainSec--; updateDisplay(); }
+    }
+
+    function updateDisplay() {
+      const s = isStopwatch ? elapsedSec : remainSec;
+      const mm = String(Math.floor(s / 60)).padStart(2, '0');
+      const ss = String(s % 60).padStart(2, '0');
+      
+      // Update minimal
+      domTime.textContent = `${mm}:${ss}`;
+      
+      // Update flip
+      if(isFlip) {
+        updateDigit('d-m1', mm[0]);
+        updateDigit('d-m2', mm[1]);
+        updateDigit('d-s1', ss[0]);
+        updateDigit('d-s2', ss[1]);
+      } else {
+        // Keeps state accurate under the hood without animating unnecessarily
+        forceFlipDraw(); 
+      }
+      document.title = `${mm}:${ss} — FlowState`;
+    }
+
+    function finishSession() {
+      pauseTimer();
+      try {
+        const actx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = actx.createOscillator(); const gain = actx.createGain();
+        osc.connect(gain); gain.connect(actx.destination);
+        osc.frequency.setValueAtTime(800, actx.currentTime);
+        gain.gain.setValueAtTime(0.5, actx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, actx.currentTime+1);
+        osc.start(); osc.stop(actx.currentTime+1);
+      } catch(e){}
+      if (activeSess === 'pomodoro') setSession('short');
+      else if (activeSess === 'short' || activeSess === 'long') setSession('pomodoro');
+    }
+
+    /* ── Tasks ───────────────────────────── */
+    let tasks = JSON.parse(localStorage.getItem('min-tasks') || '[]');
+    function saveTasks() { localStorage.setItem('min-tasks', JSON.stringify(tasks)); renderTasks(); }
+    function addTask() {
+      const inp = document.getElementById('tInput');
+      if(!inp.value.trim()) return;
+      tasks.unshift({ id: Date.now(), text: inp.value.trim(), done: false });
+      inp.value = ''; saveTasks();
+    }
+    function toggleTask(id) { const t = tasks.find(x => x.id === id); if(t) { t.done = !t.done; saveTasks(); } }
+    function delTask(id) { tasks = tasks.filter(x => x.id !== id); saveTasks(); }
+    function clearCompleted() { tasks = tasks.filter(x => !x.done); saveTasks(); }
+
+    function renderTasks() {
+      const list = document.getElementById('tList');
+      if(tasks.length === 0) { list.innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:0.9rem;text-align:center;margin-top:1rem;">All caught up.</div>'; return; }
+      list.innerHTML = tasks.map(t => `
+        <div class="task-item ${t.done?'done':''}">
+          <div class="chk" onclick="toggleTask(${t.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div class="t-text">${t.text.replace(/</g,'&lt;')}</div>
+          <button class="del" onclick="delTask(${t.id})">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    // Init
+    updateDisplay();
+    renderTasks();
+  </script>
+</body>
+</html>
