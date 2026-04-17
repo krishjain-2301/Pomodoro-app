@@ -260,9 +260,13 @@
       position: absolute;
       bottom: 2rem;
       left: 2rem;
-      width: 320px;
-      border-radius: 16px;
-      overflow: hidden;
+      width: 340px;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 1.5rem;
       box-shadow: 0 10px 30px rgba(0,0,0,0.5);
       transition: transform 0.3s ease, opacity 0.3s ease;
     }
@@ -426,7 +430,13 @@
 
   <!-- FLOATING SPOTIFY -->
   <div class="float-spotify" id="spotWidget">
-    <iframe style="border-radius:16px" src="https://open.spotify.com/embed/playlist/37i9dQZF1DWZeKCadgRdKQ?utm_source=generator&theme=0" width="100%" height="152" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+    <div class="t-header">
+      <h3>Music</h3>
+    </div>
+    <div class="t-input-wrap">
+      <input type="text" id="spotInput" placeholder="Paste Spotify link..." onkeydown="if(event.key==='Enter')loadSpotify()">
+    </div>
+    <iframe id="spotIframe" style="border-radius:12px" src="https://open.spotify.com/embed/playlist/37i9dQZF1DWZeKCadgRdKQ?utm_source=generator&theme=0" width="100%" height="80" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
   </div>
 
   <!-- FLOATING TASKS -->
@@ -570,6 +580,26 @@
       });
     }
 
+    /* ── Spotify Integration ─────────────────────── */
+    function loadSpotify() {
+      const inp = document.getElementById('spotInput');
+      const frame = document.getElementById('spotIframe');
+      let url = inp.value.trim();
+      if(!url) return;
+      
+      if(url.includes('open.spotify.com')) {
+        if(!url.includes('/embed/')) {
+          const parts = url.split('open.spotify.com/');
+          if(parts.length > 1) {
+            url = 'https://open.spotify.com/embed/' + parts[1].split('?')[0] + '?utm_source=generator&theme=0';
+          }
+        }
+        frame.src = url;
+        localStorage.setItem('min-spotify', url);
+        inp.value = ''; // clear input on success
+      }
+    }
+
     /* ── Timer Logic ─────────────────────── */
     const presets = { pomodoro: 25*60, short: 5*60, long: 15*60, custom: 25*60 };
     let activeSess = 'pomodoro', totalSec = presets.pomodoro, remainSec = totalSec, elapsedSec = 0;
@@ -669,6 +699,9 @@
     }
 
     // Init
+    const savedSpot = localStorage.getItem('min-spotify');
+    if(savedSpot) document.getElementById('spotIframe').src = savedSpot;
+    
     updateDisplay();
     renderTasks();
   </script>
